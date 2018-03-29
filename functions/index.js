@@ -95,3 +95,24 @@ exports.getfavorites = functions.https.onRequest((request, response) => {
         }
     });
 });
+
+exports.setfavorite = functions.https.onRequest((request, response) => {
+    let id = request.query.id;
+    let user = request.query.userid;
+    favoritesRef.child(user).child(id)
+        .once("value", function (snapshot) {
+            let exist = (snapshot.val() !== null);
+            if (!exist) {
+                return favoritesRef.child(user).child(id).set("true").then(
+                    response.send({
+                        status: 1
+                    })
+                );
+            } else {
+                return favoritesRef.child(user).child(id).remove()
+                    .then(response.send({
+                    status: 0
+                }));
+            }
+    });
+});
