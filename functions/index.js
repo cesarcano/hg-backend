@@ -35,10 +35,11 @@ exports.addgstation = functions.https.onRequest((request, response) => {
     let longitud = request.query.lng;
     // Se verifica si la gasolinera ya existe
     gstationsRef.child(id).once('value', function (snapshot) {
-        if (snapshot.val() !== null) {
+        let exist = (snapshot.val() !== null); 
+        if (!exist) { 
             return gstationsRef
             .child(id)
-            .set({
+            .set({  
                 nombre: nombre,
                 marca: "¡Agrega este lugar!",
                 direccion: direccion,
