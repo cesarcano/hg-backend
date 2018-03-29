@@ -111,7 +111,7 @@ exports.setfavorite = functions.https.onRequest((request, response) => {
             } else {
                 return favoritesRef.child(user).child(id).remove()
                     .then(response.send({
-                    status: 0
+                         status: 0
                 }));
             }
     });
