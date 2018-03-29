@@ -77,3 +77,21 @@ exports.getGStation = functions.https.onRequest((request, response) => {
         }
     });
 });
+
+exports.getfavorites = functions.https.onRequest((request, response) => {
+    let iduser = request.query.id;
+    favoritesRef.orderByKey().equalTo(iduser).on("value", function (snapshot) {  
+        if (snapshot.val() !== null) {
+            return response.send({
+                status: 1,
+                id: iduser,
+                properties: snapshot.toJSON()
+            });
+        } else {
+            return response.send({
+                status: 0,
+                reponse: snapshot.val()
+            });
+        }
+    });
+});
