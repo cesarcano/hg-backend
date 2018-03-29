@@ -7,7 +7,7 @@ var db = admin.database();
 // REFERENCES
 var usersRef = db.ref("/users");
 var favoritesRef = db.ref("/favorites");
-var gstationsRef = db.ref("gstations");
+var gstationsRef = db.ref("/gstations");
 
 exports.adduser = functions.https.onRequest((request, response) => {
     let id = request.query.id;
@@ -35,7 +35,7 @@ exports.addgstation = functions.https.onRequest((request, response) => {
     let longitud = request.query.lng;
     // Se verifica si la gasolinera ya existe
     gstationsRef.child(id).once('value', function (snapshot) {
-        var exist = (snapshot.val() !== null);
+        let exist = (snapshot.val() !== null);
         if (!exist) {
             return gstationsRef
             .child(id)
@@ -51,11 +51,20 @@ exports.addgstation = functions.https.onRequest((request, response) => {
                     exist : exist
             })); 
         } else {
-            response.send(
+            return response.send(
                 {
                     status: "0",
                     exist : exist
             });  
         }
       });
+});
+
+exports.getGStation = functions.https.onRequest((request, response) => {
+    let idgst = request.query.id;
+    return gstationsRef.orderByKey().equalTo(idgst).on("value", function (snapshot) {
+        response.send({
+            info: snapshot.toJSON()
+        })
+      })
 });
