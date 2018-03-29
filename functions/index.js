@@ -35,20 +35,19 @@ exports.addgstation = functions.https.onRequest((request, response) => {
     let longitud = request.query.lng;
     // Se verifica si la gasolinera ya existe
     gstationsRef.child(id).once('value', function (snapshot) {
-        let exist = (snapshot.val() !== null);
-        if (!exist) {
+        if (snapshot.val() !== null) {
             return gstationsRef
             .child(id)
             .set({
-                    nombre: nombre,
-                    marca: "¡Agrega este lugar!",
-                    direccion: direccion,
-                    latitud: latitud,
-                    longitud: longitud
+                nombre: nombre,
+                marca: "¡Agrega este lugar!",
+                direccion: direccion,
+                latitud: latitud,
+                longitud: longitud
             }).then( response.send(
                 {
-                    status: "1",
-                    exist : exist
+                status: "1",
+                exist : exist
             })); 
         } else {
             return response.send(
@@ -62,9 +61,18 @@ exports.addgstation = functions.https.onRequest((request, response) => {
 
 exports.getGStation = functions.https.onRequest((request, response) => {
     let idgst = request.query.id;
-    return gstationsRef.orderByKey().equalTo(idgst).on("value", function (snapshot) {
-        response.send({
-            info: snapshot.toJSON()
-        })
-      })
+    gstationsRef.orderByKey().equalTo(idgst).on("value", function (snapshot) {
+        if (snapshot.val() !== null) {
+            return response.send({
+                status: 1,
+                id: idgst,
+                properties: snapshot.toJSON()
+            });
+        } else {
+            return response.send({
+                status: 0,
+                reponse: snapshot.val()
+            });
+        }
+    });
 });
