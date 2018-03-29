@@ -1,50 +1,61 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+var functions = require('firebase-functions');
+var admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);
 
-exports.adduser = functions.https
-    .onRequest((request, response) => {
-        const id = request.query.id;
-        const email = request.query.email;
-        const nombre = request.query.nombre;
-        const sexo = request.query.sexo;
-        const edad = request.query.edad;
-            return admin.database()
-                .ref('/users')
-                .child(id)
-                    .set({
-                        email: email, 
-                        nombre: nombre,
-                        sexo: sexo,
-                        edad: edad
-                    }).then(
-                        response.send(
-                            {
-                                status: "1"
-                            }
-                        )
-                    );
+var db = admin.database();
+
+// REFERENCES
+var usersRef = db.ref("/users");
+var favoritesRef = db.ref("/favorites");
+var gstationsRef = db.ref("gstations");
+
+exports.adduser = functions.https.onRequest((request, response) => {
+    let id = request.query.id;
+    let email = request.query.email;
+    let nombre = request.query.nombre;
+    let sexo = request.query.sexo;
+    let edad = request.query.edad;
+    return usersRef
+        .child(id)
+        .set({
+            email: email, 
+            nombre: nombre,
+            sexo: sexo,
+            edad: edad
+        }).then( response.send({
+                status: "1"
+        }));
 });
 
-exports.addgstation = functions.https
-    .onRequest((request, response) => {
-        const id = request.query.id;
-        const direccion = request.query.direccion;
-        const nombre = request.query.nombre;
-        const latitud = request.query.lat;
-        const longitud = request.query.lng;
-            return admin.database()
-                .ref("/gstations")
-                .child(id)
-                .set({
-                        nombre: nombre,
-                        marca: "¡Agrega este lugar!",
-                        direccion: direccion,
-                        latitud: latitud,
-                        longitud: longitud
-                }).then( response.send(
-                    {
-                        status: "1"
-                    }
-                ));
-    });
+exports.addgstation = functions.https.onRequest((request, response) => {
+    let id = request.query.id;
+    let direccion = request.query.direccion;
+    let nombre = request.query.nombre;
+    let latitud = request.query.lat;
+    let longitud = request.query.lng;
+    // Se verifica si la gasolinera ya existe
+    gstationsRef.child(id).once('value', function (snapshot) {
+        var exist = (snapshot.val() !== null);
+        if (!exist) {
+            return gstationsRef
+            .child(id)
+            .set({
+                    nombre: nombre,
+                    marca: "¡Agrega este lugar!",
+                    direccion: direccion,
+                    latitud: latitud,
+                    longitud: longitud
+            }).then( response.send(
+                {
+                    status: "1",
+                    exist : exist
+            })); 
+        } else {
+            response.send(
+                {
+                    status: "0",
+                    exist : exist
+            });  
+        }
+      });
+});
