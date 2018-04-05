@@ -67,7 +67,7 @@ exports.getGStation = functions.https.onRequest((request, response) => {
             return response.send({
                 status: 1,
                 id: idgst,
-                properties: snapshot.toJSON()
+                properties: [snapshot.toJSON()]
             });
         } else {
             return response.send({
@@ -80,22 +80,32 @@ exports.getGStation = functions.https.onRequest((request, response) => {
 
 exports.getfavorites = functions.https.onRequest((request, response) => {
     let iduser = request.query.id;
-    favoritesRef.orderByKey().equalTo(iduser).on("value", function (snapshot) {  
-        if (snapshot.val() !== null) {
-            return response.send({
-                status: 1,
-                id: iduser,
-                properties: snapshot.toJSON()
-            });
-        } else {
-            return response.send({
-                status: 0,
-                reponse: snapshot.val()
-            });
-        }
-    });
+    let res = [];
+    return favoritesRef.child(iduser).on('child_added', function (snapshot) {
+        let favoriteKey = snapshot.key;
+        gstationsRef.child(favoriteKey).on('value', function (snap) {
+            console.log("key favorite: " + snap.key);
+            let values = snap.val();
+            let data = {
+                id: snap.key,
+                marca: values.marca,
+                lat: values.latitud,
+                lng: values.longitud,
+                direccion: values.direccion
+            };
+            res.push(data);
+        });
+    }).then(response.send({
+        status: 1,
+        favoritos: res
+    }));
 });
 
+/**
+ *  CRUD de gasolinera
+ */
+
+// AGREGAR/QUITAR DE FAVORITOS
 exports.setfavorite = functions.https.onRequest((request, response) => {
     let id = request.query.id;
     let user = request.query.userid;
