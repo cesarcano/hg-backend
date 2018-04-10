@@ -1,4 +1,4 @@
-var functions = require('firebase-functions');
+var functions =  require('firebase-functions');
 var admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);
 
@@ -6,45 +6,47 @@ var db = admin.database();
 
 // REFERENCES
 var usersRef = db.ref("/users");
-var favoritesRef = db.ref("/favorites");
-var gstationsRef = db.ref("/gstations");
+var favoritesRef = db.ref("/favoritos");
+var gstationsRef = db.ref("/gasolineras");
+var combustiblesRef = db.ref("/combustibles");
+var marcasRef = db.ref("/marcas");
+var comentarioRef = db.ref("/comentarios");
+var servicioRef = db.ref("/servicios");
+var preferenciasRef = db.ref("/preferencias");
 
-exports.adduser = functions.https.onRequest((request, response) => {
-    let id = request.query.id;
-    let email = request.query.email;
-    let nombre = request.query.nombre;
-    let sexo = request.query.sexo;
-    let edad = request.query.edad;
-    return usersRef
-        .child(id)
-        .set({
-            email: email, 
-            nombre: nombre,
-            sexo: sexo,
-            edad: edad
-        }).then( response.send({
-                status: "1"
-        }));
-});
+/**
+ *  AUTH
+ */
 
-exports.addgstation = functions.https.onRequest((request, response) => {
+/**
+ *  GASOLINERAS
+ */
+
+ // Agregar Gasolinera
+ exports.addgstation = functions.https.onRequest((request, response) => {
     let id = request.query.id;
     let direccion = request.query.direccion;
     let nombre = request.query.nombre;
     let latitud = request.query.lat;
     let longitud = request.query.lng;
     // Se verifica si la gasolinera ya existe
-    gstationsRef.child(id).once('value', function (snapshot) {
+    gstationsRef.child(id).once('value', (snapshot) => {
         let exist = (snapshot.val() !== null); 
         if (!exist) { 
             return gstationsRef
             .child(id)
             .set({  
-                nombre: nombre,
+                nombre: nombre, // Nombre que viene en PLACES API
                 marca: "¡Agrega este lugar!",
                 direccion: direccion,
                 latitud: latitud,
-                longitud: longitud
+                longitud: longitud,
+                calificacion: 0,
+                promocion: "false",
+                actualizacion: {
+                    fecha: "false",
+                    usuario: "false"
+                }
             }).then( response.send(
                 {
                 status: "1",
@@ -60,14 +62,28 @@ exports.addgstation = functions.https.onRequest((request, response) => {
       });
 });
 
-exports.getGStation = functions.https.onRequest((request, response) => {
-    let idgst = request.query.id;
-    gstationsRef.orderByKey().equalTo(idgst).on("value", function (snapshot) {
+// OBTENER INFO DE LA GASOLINERA
+exports.getgstation = functions.https.onRequest((request, response) => {
+    let id = request.query.id;
+    gstationsRef.child(id).on("value", (snapshot) => {
         if (snapshot.val() !== null) {
+            let values = snapshot.val();
             return response.send({
                 status: 1,
-                id: idgst,
-                properties: [snapshot.toJSON()]
+                response: {
+                    id: snapshot.key,
+                    actualizacion: {
+                        fecha: values.actualizacion.fecha,
+                        usuario: values.actualizacion.usuario
+                    },
+                    calificacion: values.calificacion,
+                    direccion: values.direccion,
+                    latitud: values.latitud,
+                    longitud: values.longitud,
+                    marca: values.marca,
+                    nombre: values.nombre,
+                    promocion: values.promocion
+                }
             });
         } else {
             return response.send({
@@ -78,13 +94,81 @@ exports.getGStation = functions.https.onRequest((request, response) => {
     });
 });
 
-exports.getfavorites = functions.https.onRequest((request, response) => {
+// OBTENER GASOLINERAS EN UN AREA
+exports.getgstations = functions.https.onRequest((req, res) => {
+    let lat = req.query.lat;
+    let lng = req.query.lng;
+    let lat_inf = lat - 0.015;
+    let lng_inf = lng - 0.015;
+    let lat_sup = parseFloat(lat) + parseFloat(0.015);
+    let lng_sup = parseFloat(lng) + parseFloat(0.015);
+
+    let response = [];
+
+    return gstationsRef.on("child_added", (snapshot) => {
+            let values = snapshot.val();
+            let isLat = ( values.latitud < lat_sup && values.latitud > lat_inf);
+            let isLng = ( values.longitud < lng_sup && values.longitud > lng_inf);
+            if (isLat && isLng) {   
+                let value = {
+                    id: snapshot.key,
+                    actualizacion: {
+                        fecha: values.actualizacion.fecha,
+                        usuario: values.actualizacion.usuario
+                    },
+                    calificacion: values.calificacion,
+                    direccion: values.direccion,
+                    latitud: values.latitud,
+                    longitud: values.longitud,
+                    marca: values.marca,
+                    nombre: values.nombre,
+                    promocion: values.promocion
+                };
+                response.push(value);
+            }
+    }).then(
+        res.send({
+            status: 1,
+            response: response
+        })
+    );
+});
+
+// Dar calificacion a gasolinera
+
+// Trigger calcular calificacion a gasolinera (cada que se agrega un comentario)
+
+/**
+ *  USUARIOS
+ */
+exports.adduser = functions.https.onRequest((request, response) => {
+    let id = request.query.id;
+    let email = request.query.email;
+    let nombre = request.query.nombre;
+    let sexo = request.query.sexo;
+    let edad = request.query.edad;
+    return usersRef
+        .child(id)
+        .set({
+            email: email,
+            nombre: nombre,
+            sexo: sexo,
+            edad: edad
+        }).then( response.send({
+                status: "1"
+        }));
+});
+
+/**
+ *  FAVORITOS
+ */
+// Obtener todos los favoritos
+exports.getfavoritos = functions.https.onRequest((request, response) => {
     let iduser = request.query.id;
     let res = [];
-    return favoritesRef.child(iduser).on('child_added', function (snapshot) {
+    return favoritesRef.child(iduser).on('child_added', (snapshot) => {
         let favoriteKey = snapshot.key;
-        gstationsRef.child(favoriteKey).on('value', function (snap) {
-            console.log("key favorite: " + snap.key);
+        gstationsRef.child(favoriteKey).on('value', (snap) => {
             let values = snap.val();
             let data = {
                 id: snap.key,
@@ -95,22 +179,20 @@ exports.getfavorites = functions.https.onRequest((request, response) => {
             };
             res.push(data);
         });
-    }).then(response.send({
-        status: 1,
-        favoritos: res
-    }));
+    }).then(
+        response.send({
+            status: 1,
+            response: res
+        })
+    );
 });
 
-/**
- *  CRUD de gasolinera
- */
-
 // AGREGAR/QUITAR DE FAVORITOS
-exports.setfavorite = functions.https.onRequest((request, response) => {
+exports.setfavorito = functions.https.onRequest((request, response) => {
     let id = request.query.id;
-    let user = request.query.userid;
+    let user = request.query.uid;
     favoritesRef.child(user).child(id)
-        .once("value", function (snapshot) {
+        .once("value", (snapshot) => {
             let exist = (snapshot.val() !== null);
             if (!exist) {
                 return favoritesRef.child(user).child(id).set("true").then(
@@ -126,3 +208,38 @@ exports.setfavorite = functions.https.onRequest((request, response) => {
             }
     });
 });
+
+/**
+ *  COMENTARIOS
+ */
+
+// Agregar comentario
+// Eliminar comentario
+// Dar like a comentario
+// Dar dislike a comentario
+// Obtener comentarios de una gasolinera (incluir JSON array de mi comentario si no lo hay poner un default)
+// Trigger eliminar comentario 
+
+
+/**
+ * SERVICIOS
+ */
+
+// Calificar un servicio
+
+// Reportar un servicio (Si existe o no existe)
+
+// Trigger para calcular la calificación del servicio 
+//(cada que se agrega una calificacion se hace promedio)
+
+// Trigger para poner los servicios en false cuando se da de alta una gasolinera
+
+
+
+/**
+ *  COMBUSTIBLES
+ */
+
+/**
+ *  MARCAS
+ */
