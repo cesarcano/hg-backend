@@ -13,7 +13,7 @@ var marcasRef = db.ref("/marcas");
 var comentarioRef = db.ref("/comentarios");
 var servicioRef = db.ref("/servicios");
 var preferenciasRef = db.ref("/preferencias");
-
+var likesref = db.ref("/reacciones");
 /**
  *  AUTH
  */
@@ -134,8 +134,6 @@ exports.getgstations = functions.https.onRequest((req, res) => {
     );
 });
 
-// Dar calificacion a gasolinera
-
 // Trigger calcular calificacion a gasolinera (cada que se agrega un comentario)
 
 /**
@@ -213,10 +211,127 @@ exports.setfavorito = functions.https.onRequest((request, response) => {
  *  COMENTARIOS
  */
 
-// Agregar comentario
-// Eliminar comentario
+// Agregar comentario / por medio de este se califica las gasolineras
+exports.addcomment = functions.https.onRequest((req, res) => {
+    let titulo = req.query.titulo; 
+    let texto = req.query.texto;
+    let uid = req.query.uid;
+    let gid = req.query.gid;
+    let rank = req.query.rank;
+    if (texto === '') {
+        texto = 'false';
+    }
+    return comentarioRef.child(gid).push({
+        calificacion: rank,
+        dislikes: 0,
+        likes: 0,
+        texto: texto,
+        titulo: titulo,
+        user: uid
+    }).then(() => {
+        return res.send({
+            status: 1
+        })
+    });
+});
+// Eliminar comentario (Trigger) cuando los dislikes superan los likes
+// Eliminar mi comentario
+exports.delmcomment = functions.https.onRequest((req, res) => {
+    let uid = req.query.uid;
+    let gid = req.query.gid;
+    return comentarioRef.child(gid).on("child_added", (snapshot) => {
+        let values = snapshot.val();
+        if(values.user === uid) {
+            comentarioRef.child(gid).child(snapshot.key).remove().then(() => {
+                return res.send({
+                    status: 1,
+                    response: true
+                });
+            }).catch((error) => {
+                console.log("error");
+            });
+        }
+    });
+});
+
 // Dar like a comentario
+exports.like = functions.https.onRequest((req, res) => {
+    let commid = req.query.id;
+    let gid = req.query.gid;
+    let uid = req.query.uid;
+    let cl = 0;
+    try {
+        return likesref.child(commid).child("likes").child(uid).set("true").then(() => {
+            likesref.child(commid).child("likes").on("value", (snap) => {
+                cl = snap.numChildren();
+            });
+            return comentarioRef.child(gid).child(commid).update({
+                "likes": cl
+            }).then(() => {
+                return comentarioRef.child(gid).child(commid).on("value", (sn) => {
+                    let vals = sn.val();
+                    res.send({
+                        status: 1,
+                        response: vals.likes
+                    });
+                });
+            });
+        }).catch(() => {
+            likesref.child(commid).child("likes").on("value", (snap) => {
+                cl = snap.numChildren();
+            });
+            return comentarioRef.child(gid).child(commid).update({
+                "likes": cl
+            }).then(() => {
+                return comentarioRef.child(gid).child(commid).on("value", (sn) => {
+                    let vals = sn.val();
+                    res.send({
+                        status: 1,
+                        response: vals.likes
+                    });
+                });
+            });             
+        });
+    } catch (error) {
+        console.log(error);
+        res.send({
+            status: 1,
+            response: 0
+        });
+    }
+});
+
 // Dar dislike a comentario
+exports.dislike = functions.https.onRequest((req, res) => {
+    let commid = req.query.id;
+    let gid = req.query.gid;
+    try {
+        let ndislikes = '';
+        comentarioRef.child(gid).child(commid).on("value", (snapshot) => {
+            let values = snapshot.val();
+            let dislikes = values.dislikes;
+            ndislikes = parseInt(dislikes) + parseInt(1);
+        });
+        return comentarioRef.child(gid).child(commid).update({
+            "dislikes": ndislikes
+        }).then(() => {
+            return comentarioRef.child(gid).child(commid).on("value", (sn) => {
+                let vals = sn.val();
+                res.send({
+                    status: 1,
+                    response: vals.dislikes
+                });
+            });
+        });
+    } catch (error) {
+        console.log(error);
+        res.send({
+            status: 1,
+            response: 0
+        });
+    }
+});
+
 // Obtener comentarios de una gasolinera (incluir JSON array de mi comentario si no lo hay poner un default)
 // Trigger eliminar comentario 
 
