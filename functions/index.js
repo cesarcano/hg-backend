@@ -164,7 +164,7 @@ exports.adduser = functions.https.onRequest((request, response) => {
 exports.getfavoritos = functions.https.onRequest((request, response) => {
     let iduser = request.query.id;
     let res = [];
-    return favoritesRef.child(iduser).on('child_added', (snapshot) => {
+    favoritesRef.child(iduser).on('child_added', (snapshot) => {
         let favoriteKey = snapshot.key;
         gstationsRef.child(favoriteKey).on('value', (snap) => {
             let values = snap.val();
@@ -177,12 +177,12 @@ exports.getfavoritos = functions.https.onRequest((request, response) => {
             };
             res.push(data);
         });
-    }).then(
-        response.send({
-            status: 1,
-            response: res
-        })
-    );
+    });
+
+    return response.send({
+        status: 1,
+        response: res
+    });
 });
 
 // AGREGAR/QUITAR DE FAVORITOS
