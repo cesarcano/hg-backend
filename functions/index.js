@@ -105,7 +105,7 @@ exports.getgstations = functions.https.onRequest((req, res) => {
 
     let response = [];
 
-    return gstationsRef.on("child_added", (snapshot) => {
+    gstationsRef.on("child_added", (snapshot) => {
             let values = snapshot.val();
             let isLat = ( values.latitud < lat_sup && values.latitud > lat_inf);
             let isLng = ( values.longitud < lng_sup && values.longitud > lng_inf);
@@ -126,12 +126,12 @@ exports.getgstations = functions.https.onRequest((req, res) => {
                 };
                 response.push(value);
             }
-    }).then(
-        res.send({
-            status: 1,
-            response: response
-        })
-    );
+    });
+
+    return res.send({
+        status: 1,
+        response: response
+    })
 });
 
 // Trigger calcular calificacion a gasolinera (cada que se agrega un comentario)
