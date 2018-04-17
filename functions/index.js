@@ -65,7 +65,7 @@ var likesref = db.ref("/reacciones");
 // OBTENER INFO DE LA GASOLINERA
 exports.getgstation = functions.https.onRequest((request, response) => {
     let id = request.query.id;
-    gstationsRef.child(id).on("value", (snapshot) => {
+    gstationsRef.child(id).once("value", (snapshot) => {
         if (snapshot.val() !== null) {
             let values = snapshot.val();
             return response.send({
@@ -257,21 +257,21 @@ exports.delmcomment = functions.https.onRequest((req, res) => {
         }));
 });
 
-// Dar like a comentario
-exports.like = functions.https.onRequest((req, res) => {
+// Dar like/dislike
+exports.likeit = functions.https.onRequest((req, res) => {
     let commid = req.query.id;
     let gid = req.query.gid;
     let uid = req.query.uid;
     let cl = 0;
     try {
         return likesref.child(commid).child("likes").child(uid).set("true").then(() => {
-            likesref.child(commid).child("likes").on("value", (snap) => {
+            likesref.child(commid).child("likes").once("value", (snap) => {
                 cl = snap.numChildren();
             });
             return comentarioRef.child(gid).child(commid).update({
                 "likes": cl
             }).then(() => {
-                return comentarioRef.child(gid).child(commid).on("value", (sn) => {
+                return comentarioRef.child(gid).child(commid).once("value", (sn) => {
                     let vals = sn.val();
                     res.send({
                         status: 1,
@@ -304,38 +304,9 @@ exports.like = functions.https.onRequest((req, res) => {
     }
 });
 
-// Dar dislike a comentario
-exports.dislike = functions.https.onRequest((req, res) => {
-    let commid = req.query.id;
-    let gid = req.query.gid;
-    try {
-        let ndislikes = '';
-        comentarioRef.child(gid).child(commid).on("value", (snapshot) => {
-            let values = snapshot.val();
-            let dislikes = values.dislikes;
-            ndislikes = parseInt(dislikes) + parseInt(1);
-        });
-        return comentarioRef.child(gid).child(commid).update({
-            "dislikes": ndislikes
-        }).then(() => {
-            return comentarioRef.child(gid).child(commid).on("value", (sn) => {
-                let vals = sn.val();
-                res.send({
-                    status: 1,
-                    response: vals.dislikes
-                });
-            });
-        });
-    } catch (error) {
-        console.log(error);
-        res.send({
-            status: 1,
-            response: 0
-        });
-    }
-});
-
 // Obtener comentarios de una gasolinera (incluir JSON array de mi comentario si no lo hay poner un default)
+
+
 // Trigger eliminar comentario 
 
 
