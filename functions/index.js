@@ -218,31 +218,39 @@ exports.addcomment = functions.https.onRequest((req, res) => {
     let uid = req.query.uid;
     let gid = req.query.gid;
     let rank = req.query.rank;
+
+    let usersIds = [];
+
     if (texto === '') {
         texto = false;
     }
     // Revisando si se ha comentado en esa gasolinera
-    return comentarioRef.child(gid).child(uid).once("value", (snapshot) => {
-        if (snapshot.val() === null) {
-            return comentarioRef.child(gid).child(uid).set({
-                calificacion: rank,
-                dislikes: 0,
-                likes: 0,
-                texto: texto,
-                titulo: titulo,
-            }).then(()=> {
-                return res.send({
-                    status: 1,
-                    response: 1
-                });
-            });
-        } else {
-            res.send({
-                status: 1,
-                response: 0
-            });
-        }
+    comentarioRef.child(gid).on("child_added", (snap) => {
+        let values = snap.val();
+        let user = values.user;
+        usersIds.push(user);
     });
+
+    if (!usersIds.includes(uid, 0)) {
+        return comentarioRef.child(gid).push({
+            calificacion: rank,
+            dislikes: 0,
+            likes: 0,
+            texto: texto,
+            titulo: titulo,
+            user: uid
+        }).then(()=> {
+            return res.send({
+                status: 1,
+                response: 1
+            });
+        });        
+    } else {
+        res.send({
+            status: 1,
+            response: 0
+        });
+    }
 });
 // Eliminar comentario (Trigger) cuando los dislikes superan los likes
 
@@ -305,10 +313,28 @@ exports.likeit = functions.https.onRequest((req, res) => {
 });
 
 // Obtener comentarios de una gasolinera (incluir JSON array de mi comentario si no lo hay poner un default)
-
-
-// Trigger eliminar comentario 
-
+exports.getcomentarios = functions.https.onRequest((req, res) => {
+    let gid = req.query.gid;
+    let uid = req.query.uid;
+    let response = [];
+    comentarioRef.child(gid).on("child_added", (snapshot) => {
+        let values = snapshot.val();
+        let data = {
+            calificacion: values.calificacion,
+            dislikes: values.dislikes,
+            likes: values.likes,
+            texto: values.texto,
+            titulo: values.titulo,
+            id: snapshot.key,
+            user: values.user
+        };
+        response.push(data);
+    });
+    return res.send({
+        status: 1,
+        response: response
+    });
+});
 
 /**
  * SERVICIOS
