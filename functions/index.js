@@ -218,58 +218,43 @@ exports.addcomment = functions.https.onRequest((req, res) => {
     let uid = req.query.uid;
     let gid = req.query.gid;
     let rank = req.query.rank;
-    let exist = false;
-    let _response = 0;
     if (texto === '') {
-        texto = 'false';
+        texto = false;
     }
-
     // Revisando si se ha comentado en esa gasolinera
-    comentarioRef.child(gid).on("child_added", (snapshot) => {
-        // por cada child se busca el id de usuario en la propiedad user
-        let values = snapshot.val();
-        let iduser = values.user;
-        if (iduser == uid) {
-            console.log("##########Ya comentaste");
-            exist = true;
+    return comentarioRef.child(gid).child(uid).once("value", (snapshot) => {
+        if (snapshot.val() === null) {
+            return comentarioRef.child(gid).child(uid).set({
+                calificacion: rank,
+                dislikes: 0,
+                likes: 0,
+                texto: texto,
+                titulo: titulo,
+            }).then(()=> {
+                return res.send({
+                    status: 1,
+                    response: 1
+                });
+            });
+        } else {
+            res.send({
+                status: 1,
+                response: 0
+            });
         }
-    });
-    if(!exist) {
-        _response = 1;
-        console.log("###########push nuevo comentario");
-        comentarioRef.child(gid).push({
-            calificacion: rank,
-            dislikes: 0,
-            likes: 0,
-            texto: texto,
-            titulo: titulo,
-            user: uid
-        });
-    }
-
-    return res.send({
-        status: 1,
-        response: _response
     });
 });
 // Eliminar comentario (Trigger) cuando los dislikes superan los likes
+
 // Eliminar mi comentario
 exports.delmcomment = functions.https.onRequest((req, res) => {
     let uid = req.query.uid;
     let gid = req.query.gid;
-    return comentarioRef.child(gid).on("child_added", (snapshot) => {
-        let values = snapshot.val();
-        if(values.user === uid) {
-            comentarioRef.child(gid).child(snapshot.key).remove().then(() => {
-                return res.send({
-                    status: 1,
-                    response: true
-                });
-            }).catch((error) => {
-                console.log("error");
-            });
-        }
-    });
+    return comentarioRef.child(gid).child(uid).remove().then(
+        res.send({
+            status: 1,
+            response: "done"
+        }));
 });
 
 // Dar like a comentario
