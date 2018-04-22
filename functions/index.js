@@ -4,6 +4,11 @@ admin.initializeApp(functions.config().firebase);
 
 var db = admin.database();
 
+/**
+ *  EXTRAS
+ */
+const httpsReq = require('https');
+
 // REFERENCES
 var usersRef = db.ref("/users");
 var favoritesRef = db.ref("/favoritos");
@@ -23,13 +28,7 @@ var likesref = db.ref("/reacciones");
  */
 
  // Agregar Gasolinera
- exports.addgstation = functions.https.onRequest((request, response) => {
-    let id = request.query.id;
-    let direccion = request.query.direccion;
-    let nombre = request.query.nombre;
-    let latitud = request.query.lat;
-    let longitud = request.query.lng;
-    // Se verifica si la gasolinera ya existe
+ function addgstation(id, nombre, direccion, lat, lng) {
     gstationsRef.child(id).once('value', (snapshot) => {
         let exist = (snapshot.val() !== null); 
         if (!exist) { 
@@ -39,29 +38,18 @@ var likesref = db.ref("/reacciones");
                 nombre: nombre, // Nombre que viene en PLACES API
                 marca: "¡Agrega este lugar!",
                 direccion: direccion,
-                latitud: latitud,
-                longitud: longitud,
+                latitud: lat,
+                longitud: lng,
                 calificacion: 0,
                 promocion: "false",
                 actualizacion: {
                     fecha: "false",
                     usuario: "false"
                 }
-            }).then( response.send(
-                {
-                status: "1",
-                exist : exist
-            })); 
-        } else {
-            return response.send(
-                {
-                    status: "0",
-                    exist : exist
-            });  
+            });
         }
-      });
-});
-
+    });
+ }
 // OBTENER INFO DE LA GASOLINERA
 exports.getgstation = functions.https.onRequest((request, response) => {
     let id = request.query.id;
@@ -94,6 +82,39 @@ exports.getgstation = functions.https.onRequest((request, response) => {
     });
 });
 
+// OBTENER GASOLINERAS CERCANAS DESDE API GOOGLE
+function getPlaces(lat, lng, name) {
+    let gstations = [];
+    let googleApiKey = 'AIzaSyAoeIJWYdCLDklb4dTlCD2-MFAtOtctCsY';
+    let radius = '2000'; // en metros
+    let data = '';
+    let url = 
+    "https://maps.googleapis.com/maps/api/place/nearbysearch/json?"+
+    "location="+ lat + "," + lng + 
+    "&radius=" + radius +"&type=gas_station" +
+    "&name=" + name + "&key=" + googleApiKey;
+    httpsReq.get(url, (res) => {
+        res.on("data", (subr) => {
+            data += subr;
+        });
+        res.on('end', () => {
+            console.log("obteniendo gasolineras");
+            updateGStns(JSON.parse(data));
+          });
+    }).on("error", (err) => {
+        console.log("Error: " + err.message);
+        return 0;
+    });
+}
+
+function updateGStns(data) {
+    //console.log(data);
+    data.results.forEach(gs => {
+        addgstation(gs.place_id, gs.name, gs.vicinity, 
+                gs.geometry.location.lat, gs.geometry.location.lng );
+    });
+}
+
 // OBTENER GASOLINERAS EN UN AREA
 exports.getgstations = functions.https.onRequest((req, res) => {
     let lat = req.query.lat;
@@ -104,6 +125,8 @@ exports.getgstations = functions.https.onRequest((req, res) => {
     let lng_sup = parseFloat(lng) + parseFloat(0.015);
 
     let response = [];
+
+    getPlaces(lat, lng, "");
 
     gstationsRef.on("child_added", (snapshot) => {
             let values = snapshot.val();
@@ -127,11 +150,10 @@ exports.getgstations = functions.https.onRequest((req, res) => {
                 response.push(value);
             }
     });
-
     return res.send({
         status: 1,
         response: response
-    })
+    });
 });
 
 // Trigger calcular calificacion a gasolinera (cada que se agrega un comentario)
