@@ -36,12 +36,12 @@ var likesref = db.ref("/reacciones");
             .child(id)
             .set({  
                 nombre: nombre, // Nombre que viene en PLACES API
-                marca: "¡Agrega este lugar!",
+                marca: "¡Actualiza este lugar!",
                 direccion: direccion,
                 latitud: lat,
                 longitud: lng,
                 calificacion: 0,
-                promocion: "false",
+                promocion: 0,
                 actualizacion: {
                     fecha: "false",
                     usuario: "false"
@@ -86,7 +86,7 @@ exports.getgstation = functions.https.onRequest((request, response) => {
 function getPlaces(lat, lng, name) {
     let gstations = [];
     let googleApiKey = 'AIzaSyAoeIJWYdCLDklb4dTlCD2-MFAtOtctCsY';
-    let radius = '2000'; // en metros
+    let radius = '5000'; // en metros
     let data = '';
     let url = 
     "https://maps.googleapis.com/maps/api/place/nearbysearch/json?"+
@@ -100,15 +100,14 @@ function getPlaces(lat, lng, name) {
         res.on('end', () => {
             console.log("obteniendo gasolineras");
             updateGStns(JSON.parse(data));
-          });
+            });
     }).on("error", (err) => {
         console.log("Error: " + err.message);
         return 0;
     });
 }
-
 function updateGStns(data) {
-    //console.log(data);
+    console.log(data);
     data.results.forEach(gs => {
         addgstation(gs.place_id, gs.name, gs.vicinity, 
                 gs.geometry.location.lat, gs.geometry.location.lng );
@@ -119,14 +118,14 @@ function updateGStns(data) {
 exports.getgstations = functions.https.onRequest((req, res) => {
     let lat = req.query.lat;
     let lng = req.query.lng;
-    let lat_inf = lat - 0.015;
-    let lng_inf = lng - 0.015;
-    let lat_sup = parseFloat(lat) + parseFloat(0.015);
-    let lng_sup = parseFloat(lng) + parseFloat(0.015);
+    let lat_inf = lat - 0.015
+    let lng_inf = lng - 0.015
+    let lat_sup = parseFloat(lat) + parseFloat(0.15);
+    let lng_sup = parseFloat(lng) + parseFloat(0.15);
 
     let response = [];
 
-    getPlaces(lat, lng, "");
+    getPlaces(lat, lng, " ");
 
     gstationsRef.on("child_added", (snapshot) => {
             let values = snapshot.val();
