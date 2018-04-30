@@ -29,7 +29,7 @@ var likesref = db.ref("/reacciones");
 
  // Agregar Gasolinera
  function addgstation(id, nombre, direccion, lat, lng) {
-    gstationsRef.child(id).once('value', (snapshot) => {
+    return gstationsRef.child(id).once('value', (snapshot) => {
         let exist = (snapshot.val() !== null); 
         if (!exist) { 
             return gstationsRef
@@ -43,8 +43,8 @@ var likesref = db.ref("/reacciones");
                 calificacion: 0,
                 promocion: 0,
                 actualizacion: {
-                    fecha: "false",
-                    usuario: "false"
+                    fecha: 0,
+                    usuario: 0
                 }
             });
         }
@@ -86,7 +86,7 @@ exports.getgstation = functions.https.onRequest((request, response) => {
 function getPlaces(lat, lng, name) {
     let gstations = [];
     let googleApiKey = 'AIzaSyAoeIJWYdCLDklb4dTlCD2-MFAtOtctCsY';
-    let radius = '5000'; // en metros
+    let radius = '3000'; // en metros
     let data = '';
     let url = 
     "https://maps.googleapis.com/maps/api/place/nearbysearch/json?"+
@@ -118,10 +118,10 @@ function updateGStns(data) {
 exports.getgstations = functions.https.onRequest((req, res) => {
     let lat = req.query.lat;
     let lng = req.query.lng;
-    let lat_inf = lat - 0.015
-    let lng_inf = lng - 0.015
-    let lat_sup = parseFloat(lat) + parseFloat(0.15);
-    let lng_sup = parseFloat(lng) + parseFloat(0.15);
+    let lat_inf = lat - 0.05;
+    let lng_inf = lng - 0.05;
+    let lat_sup = parseFloat(lat) + parseFloat(0.05);
+    let lng_sup = parseFloat(lng) + parseFloat(0.05);
 
     let response = [];
 
@@ -234,7 +234,6 @@ exports.setfavorito = functions.https.onRequest((request, response) => {
 
 // Agregar comentario / por medio de este se califica las gasolineras
 exports.addcomment = functions.https.onRequest((req, res) => {
-    let titulo = req.query.titulo; 
     let texto = req.query.texto;
     let uid = req.query.uid;
     let gid = req.query.gid;
@@ -243,35 +242,44 @@ exports.addcomment = functions.https.onRequest((req, res) => {
     let usersIds = [];
 
     if (texto === '') {
-        texto = false;
+        texto = 0;
     }
     // Revisando si se ha comentado en esa gasolinera
-    comentarioRef.child(gid).on("child_added", (snap) => {
-        let values = snap.val();
-        let user = values.user;
-        usersIds.push(user);
-    });
-
-    if (!usersIds.includes(uid, 0)) {
-        return comentarioRef.child(gid).push({
-            calificacion: rank,
-            dislikes: 0,
-            likes: 0,
-            texto: texto,
-            titulo: titulo,
-            user: uid
-        }).then(()=> {
-            return res.send({
-                status: 1,
-                response: 1
+    return comentarioRef.child(gid).once("value", (snapshot) => {
+        if (snapshot.val() === null) {
+            return comentarioRef.child(gid).push({
+                calificacion: rank,
+                dislikes: 0,
+                likes: 0,
+                texto: texto,
+                user: uid
+            }).then(()=> {
+                return res.send({
+                    status: 1,
+                    response: 1
+                });
             });
-        });        
-    } else {
-        res.send({
-            status: 1,
-            response: 0
-        });
-    }
+        } else {
+            snapshot.forEach(element => {
+                let values = element.val();
+                console.log(values.user);
+                if (values.user === uid) {
+                    return comentarioRef.child(gid).child(element.key).set({
+                        calificacion: rank,
+                        dislikes: 0,
+                        likes: 0,
+                        texto: texto,
+                        user: uid
+                    }).then(()=> {
+                        return res.send({
+                            status: 1,
+                            response: 1
+                        });
+                    });      
+                }
+            });
+        }
+    });
 });
 // Eliminar comentario (Trigger) cuando los dislikes superan los likes
 
@@ -279,11 +287,26 @@ exports.addcomment = functions.https.onRequest((req, res) => {
 exports.delmcomment = functions.https.onRequest((req, res) => {
     let uid = req.query.uid;
     let gid = req.query.gid;
-    return comentarioRef.child(gid).child(uid).remove().then(
-        res.send({
-            status: 1,
-            response: "done"
-        }));
+    return comentarioRef.child(gid).once("value", (snapshot) => {
+        if (snapshot.val() !== null) {
+            snapshot.forEach(element => {
+                let value = element.val();
+                if (value.user === uid) {
+                    return element.ref.remove().then(
+                        res.send({
+                            status: 1,
+                            response: "done"
+                        }));
+                }
+            });
+        } else {
+            res.send({
+                status: 1,
+                response: 0
+            });
+        }
+        
+    });
 });
 
 // Dar like/dislike
