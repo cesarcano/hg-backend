@@ -19,6 +19,18 @@ var comentarioRef = db.ref("/comentarios");
 var servicioRef = db.ref("/servicios");
 var preferenciasRef = db.ref("/preferencias");
 var likesref = db.ref("/reacciones");
+
+// RESPONSE 
+var mResponse = {
+    status: "",
+    response: "",
+    message: ""
+};
+
+var msg_ok = "ok";
+var msg_error = "error";
+var msg_tryAgain = "again";
+
 /**
  *  AUTH
  */
@@ -127,13 +139,14 @@ exports.getgstations = functions.https.onRequest((req, res) => {
 
     getPlaces(lat, lng, " ");
 
-    gstationsRef.on("child_added", (snapshot) => {
-            let values = snapshot.val();
+    return gstationsRef.once("value", (snapshot) => {
+        snapshot.forEach(gst => {
+            let values = gst.val();
             let isLat = ( values.latitud < lat_sup && values.latitud > lat_inf);
             let isLng = ( values.longitud < lng_sup && values.longitud > lng_inf);
             if (isLat && isLng) {   
                 let value = {
-                    id: snapshot.key,
+                    id: gst.key,
                     actualizacion: {
                         fecha: values.actualizacion.fecha,
                         usuario: values.actualizacion.usuario
@@ -148,10 +161,17 @@ exports.getgstations = functions.https.onRequest((req, res) => {
                 };
                 response.push(value);
             }
-    });
-    return res.send({
-        status: 1,
-        response: response
+        });
+    }).then(() => {
+        mResponse.response = response;
+        mResponse.status = res.statusCode;
+        if (res.statusCode === 200) {
+            mResponse.message = msg_ok;
+        } else {
+            mResponse.response = null;
+            mResponse.message = msg_error;
+        }
+        return res.send(mResponse);
     });
 });
 
@@ -185,24 +205,30 @@ exports.adduser = functions.https.onRequest((request, response) => {
 exports.getfavoritos = functions.https.onRequest((request, response) => {
     let iduser = request.query.id;
     let res = [];
-    favoritesRef.child(iduser).on('child_added', (snapshot) => {
-        let favoriteKey = snapshot.key;
-        gstationsRef.child(favoriteKey).on('value', (snap) => {
-            let values = snap.val();
-            let data = {
-                id: snap.key,
-                marca: values.marca,
-                lat: values.latitud,
-                lng: values.longitud,
-                direccion: values.direccion
-            };
-            res.push(data);
-        });
-    });
-
-    return response.send({
-        status: 1,
-        response: res
+    return favoritesRef.child(iduser).once("value", (snapshot) => {
+        snapshot.forEach(element => {
+            gstationsRef.on("value", (snap) => {
+                snap.forEach(e => {
+                    if (e.key === element.key) {
+                        console.log(e.key);
+                        let values = e.val();
+                        let data = {
+                            id: e.key,
+                            marca: values.marca,
+                            lat: values.latitud,
+                            lng: values.longitud,
+                            direccion: values.direccion
+                        };
+                        res.push(data);
+                    }
+                });
+            });
+        }); 
+    }).then(() => {
+        mResponse.message = msg_ok;
+        mResponse.response = res;
+        mResponse.status = response.statusCode;
+        return response.send(mResponse);
     });
 });
 
@@ -210,20 +236,24 @@ exports.getfavoritos = functions.https.onRequest((request, response) => {
 exports.setfavorito = functions.https.onRequest((request, response) => {
     let id = request.query.id;
     let user = request.query.uid;
-    favoritesRef.child(user).child(id)
+    return favoritesRef.child(user).child(id)
         .once("value", (snapshot) => {
             let exist = (snapshot.val() !== null);
             if (!exist) {
-                return favoritesRef.child(user).child(id).set("true").then(
-                    response.send({
-                        status: 1
-                    })
-                );
+                return favoritesRef.child(user).child(id).set("true").then(() => {
+                    mResponse.response = null;
+                    mResponse.status = response.statusCode;
+                    mResponse.message = msg_ok;
+                    return response.send(mResponse);
+                });
             } else {
                 return favoritesRef.child(user).child(id).remove()
-                    .then(response.send({
-                         status: 0
-                }));
+                    .then(() => {
+                        mResponse.response = null;
+                        mResponse.status = response.statusCode;
+                        mResponse.message = msg_ok;
+                        return response.send(mResponse);
+                    });
             }
     });
 });
@@ -254,10 +284,10 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                 texto: texto,
                 user: uid
             }).then(()=> {
-                return res.send({
-                    status: 1,
-                    response: 1
-                });
+                mResponse.message = msg_ok;
+                mResponse.response = null;
+                mResponse.status = res.statusCode;
+                return res.send(mResponse);
             });
         } else {
             snapshot.forEach(element => {
@@ -271,10 +301,10 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                         texto: texto,
                         user: uid
                     }).then(()=> {
-                        return res.send({
-                            status: 1,
-                            response: 1
-                        });
+                        mResponse.message = msg_ok;
+                        mResponse.response = null;
+                        mResponse.status = res.statusCode;
+                        return res.send(mResponse);
                     });      
                 }
             });
@@ -296,16 +326,16 @@ exports.delmcomment = functions.https.onRequest((req, res) => {
                         res.send({
                             status: 1,
                             response: "done"
-                        }));
+                        })
+                    );
                 }
             });
         } else {
-            res.send({
-                status: 1,
-                response: 0
-            });
+            mResponse.message = msg_ok;
+            mResponse.response = null;
+            mResponse.status = res.statusCode;
+            return res.send(mResponse);
         }
-        
     });
 });
 
