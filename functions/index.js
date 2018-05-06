@@ -282,7 +282,8 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                 dislikes: 0,
                 likes: 0,
                 texto: texto,
-                user: uid
+                user: uid,
+                frecha: 0 // PONER FECHA
             }).then(()=> {
                 mResponse.message = "Comentario enviado";
                 mResponse.response = null;
@@ -389,24 +390,32 @@ exports.likeit = functions.https.onRequest((req, res) => {
 // Obtener comentarios de una gasolinera (incluir JSON array de mi comentario si no lo hay poner un default)
 exports.getcomentarios = functions.https.onRequest((req, res) => {
     let gid = req.query.gid;
-    let uid = req.query.uid;
     let response = [];
-    comentarioRef.child(gid).on("child_added", (snapshot) => {
-        let values = snapshot.val();
-        let data = {
-            calificacion: values.calificacion,
-            dislikes: values.dislikes,
-            likes: values.likes,
-            texto: values.texto,
-            titulo: values.titulo,
-            id: snapshot.key,
-            user: values.user
-        };
-        response.push(data);
-    });
-    return res.send({
-        status: 1,
-        response: response
+    return comentarioRef.child(gid).once("value", (snapshot) => {
+        snapshot.forEach(element => {
+            let values = element.val();
+            return usersRef.child(values.user).once("value", (s) => {
+                let val = s.val();
+                let data = {
+                    calificacion: values.calificacion,
+                    dislikes: values.dislikes,
+                    likes: values.likes,
+                    texto: values.texto,
+                    titulo: values.titulo,
+                    gid: snapshot.key,
+                    id: element.key,
+                    user: val.nombre,
+                    fecha: values.fecha
+                };
+            response.push(data);
+            }).then(() => {
+                mResponse.response = response;
+                mResponse.status = res.statusCode;
+                mResponse.message = msg_ok;
+                return res.send(mResponse);
+            });
+           
+        });
     });
 });
 
