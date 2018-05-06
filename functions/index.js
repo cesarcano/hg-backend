@@ -243,7 +243,7 @@ exports.setfavorito = functions.https.onRequest((request, response) => {
                 return favoritesRef.child(user).child(id).set("true").then(() => {
                     mResponse.response = null;
                     mResponse.status = response.statusCode;
-                    mResponse.message = msg_ok;
+                    mResponse.message = true;
                     return response.send(mResponse);
                 });
             } else {
@@ -251,7 +251,7 @@ exports.setfavorito = functions.https.onRequest((request, response) => {
                     .then(() => {
                         mResponse.response = null;
                         mResponse.status = response.statusCode;
-                        mResponse.message = msg_ok;
+                        mResponse.message = false;
                         return response.send(mResponse);
                     });
             }
@@ -284,7 +284,7 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                 texto: texto,
                 user: uid
             }).then(()=> {
-                mResponse.message = msg_ok;
+                mResponse.message = "Comentario enviado";
                 mResponse.response = null;
                 mResponse.status = res.statusCode;
                 return res.send(mResponse);
@@ -301,7 +301,7 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                         texto: texto,
                         user: uid
                     }).then(()=> {
-                        mResponse.message = msg_ok;
+                        mResponse.message = "Comentario actualizado";
                         mResponse.response = null;
                         mResponse.status = res.statusCode;
                         return res.send(mResponse);
