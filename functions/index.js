@@ -404,6 +404,7 @@ exports.getcomentarios = functions.https.onRequest((req, res) => {
                     titulo: values.titulo,
                     gid: snapshot.key,
                     id: element.key,
+                    uid: values.user,
                     user: val.nombre,
                     fecha: values.fecha
                 };
