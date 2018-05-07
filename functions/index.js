@@ -40,7 +40,10 @@ var msg_tryAgain = "again";
  */
 
  // Agregar Gasolinera
- function addgstation(id, nombre, direccion, lat, lng) {
+ function addgstation(id, nombre, direccion, lat, lng, uid) {
+     if (uid === '') {
+         uid = "--";
+     }
     return gstationsRef.child(id).once('value', (snapshot) => {
         let exist = (snapshot.val() !== null); 
         if (!exist) { 
@@ -48,15 +51,16 @@ var msg_tryAgain = "again";
             .child(id)
             .set({  
                 nombre: nombre, // Nombre que viene en PLACES API
-                marca: "¡Actualiza este lugar!",
+                marca: "¡Reporta el lugar!",
                 direccion: direccion,
                 latitud: lat,
                 longitud: lng,
                 calificacion: 0,
                 promocion: 0,
                 actualizacion: {
-                    fecha: 0,
-                    usuario: 0
+                    fecha: new Date().toLocaleDateString(),
+                    hora: new Date().toLocaleTimeString(),
+                    usuario: uid
                 }
             });
         }
@@ -122,7 +126,7 @@ function updateGStns(data) {
     console.log(data);
     data.results.forEach(gs => {
         addgstation(gs.place_id, gs.name, gs.vicinity, 
-                gs.geometry.location.lat, gs.geometry.location.lng );
+                gs.geometry.location.lat, gs.geometry.location.lng, '');
     });
 }
 
@@ -269,7 +273,7 @@ exports.addcomment = functions.https.onRequest((req, res) => {
     let gid = req.query.gid;
     let rank = req.query.rank;
 
-    let usersIds = [];
+    let users = [];
 
     if (texto === '') {
         texto = 0;
@@ -283,7 +287,7 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                 likes: 0,
                 texto: texto,
                 user: uid,
-                frecha: 0 // PONER FECHA
+                fecha: new Date().toLocaleDateString()// PONER FECHA
             }).then(()=> {
                 mResponse.message = "Comentario enviado";
                 mResponse.response = null;
@@ -300,13 +304,28 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                         dislikes: 0,
                         likes: 0,
                         texto: texto,
-                        user: uid
+                        user: uid,
+                        fecha: new Date().toLocaleDateString()
                     }).then(()=> {
                         mResponse.message = "Comentario actualizado";
                         mResponse.response = null;
                         mResponse.status = res.statusCode;
                         return res.send(mResponse);
                     });      
+                } else {
+                    return comentarioRef.child(gid).push({
+                        calificacion: rank,
+                        dislikes: 0,
+                        likes: 0,
+                        texto: texto,
+                        user: uid,
+                        fecha: new Date().toLocaleDateString()
+                    }).then(()=> {
+                        mResponse.message = "Comentario enviado";
+                        mResponse.response = null;
+                        mResponse.status = res.statusCode;
+                        return res.send(mResponse);
+                    });
                 }
             });
         }
