@@ -1,4 +1,4 @@
-var functions =  require('firebase-functions');
+var functions = require('firebase-functions');
 var admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);
 
@@ -8,6 +8,13 @@ var db = admin.database();
  *  EXTRAS
  */
 const httpsReq = require('https');
+
+MarcasArray = ["OXXOGAS", "GASORED", "PETRO-7",
+ "HIDROSINA", "ORSAN", "EXXONMOBIL", "REDCO", 
+ "GRUPOECO", "GASMART", "LAGAS", "NEXUM", 
+ "LODEMO", "BP", "RENDICHICAS", "FULLGAS", 
+ "RENDIMAX", "GASMEX", "SHELL", "GASTOP", 
+ "SMARTGAS", "APPRO", "COSTCO", "PEMEX"]
 
 // REFERENCES
 var usersRef = db.ref("/users");
@@ -48,7 +55,6 @@ var msg_tryAgain = "again";
             .child(id)
             .set({  
                 nombre: nombre, // Nombre que viene en PLACES API
-                marca: "¡Actualiza este lugar!",
                 direccion: direccion,
                 latitud: lat,
                 longitud: lng,
@@ -57,6 +63,11 @@ var msg_tryAgain = "again";
                 actualizacion: {
                     fecha: 0,
                     usuario: 0
+                },
+                combustibles: {
+                    regular: "false",
+                    premium: "false",
+                    diesel: "false",
                 }
             });
         }
@@ -80,7 +91,6 @@ exports.getgstation = functions.https.onRequest((request, response) => {
                     direccion: values.direccion,
                     latitud: values.latitud,
                     longitud: values.longitud,
-                    marca: values.marca,
                     nombre: values.nombre,
                     promocion: values.promocion
                 }
@@ -110,7 +120,7 @@ function getPlaces(lat, lng, name) {
             data += subr;
         });
         res.on('end', () => {
-            console.log("obteniendo gasolineras");
+            //console.log("obteniendo gasolineras");
             updateGStns(JSON.parse(data));
             });
     }).on("error", (err) => {
@@ -119,7 +129,7 @@ function getPlaces(lat, lng, name) {
     });
 }
 function updateGStns(data) {
-    console.log(data);
+    //console.log(data);
     data.results.forEach(gs => {
         addgstation(gs.place_id, gs.name, gs.vicinity, 
                 gs.geometry.location.lat, gs.geometry.location.lng );
@@ -155,9 +165,13 @@ exports.getgstations = functions.https.onRequest((req, res) => {
                     direccion: values.direccion,
                     latitud: values.latitud,
                     longitud: values.longitud,
-                    marca: values.marca,
                     nombre: values.nombre,
-                    promocion: values.promocion
+                    promocion: values.promocion,
+                    combustibles: {
+                        regular: values.combustibles.regular,
+                        premium: values.combustibles.premium,
+                        diesel: values.combustibles.diesel
+                    }
                 };
                 response.push(value);
             }
@@ -251,7 +265,7 @@ exports.setfavorito = functions.https.onRequest((request, response) => {
                     .then(() => {
                         mResponse.response = null;
                         mResponse.status = response.statusCode;
-                        mResponse.message = false;
+                        mResponse.message = "false";
                         return response.send(mResponse);
                     });
             }
@@ -431,14 +445,7 @@ exports.getcomentarios = functions.https.onRequest((req, res) => {
 // Trigger para calcular la calificación del servicio 
 //(cada que se agrega una calificacion se hace promedio)
 
-// Trigger para poner los servicios en false cuando se da de alta una gasolinera
-
-
-
-/**
- *  COMBUSTIBLES
- */
-
+// Trigger para poner los servicios en "false" cuando se da de alta una gasolinera
 /**
  *  MARCAS
  */
