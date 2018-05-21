@@ -61,14 +61,21 @@ var msg_tryAgain = "again";
                 calificacion: 0,
                 promocion: 0,
                 actualizacion: {
-                    fecha: 0,
+                    fecha: new Date().toLocaleDateString(),
                     usuario: 0
-                },
-                combustibles: {
-                    regular: "false",
-                    premium: "false",
-                    diesel: "false",
                 }
+            }).then(() => {
+                return combustiblesRef.child(id).set({
+                    regular: 0,
+                    premium: 0,
+                    diesel: 0
+                }).then(() => {
+                    return servicioRef.child(id).set({
+                        wc: 0,
+                        atm: 0,
+                        shop: 0
+                    });
+                }); 
             });
         }
     });
@@ -167,12 +174,8 @@ exports.getgstations = functions.https.onRequest((req, res) => {
                     longitud: values.longitud,
                     nombre: values.nombre,
                     promocion: values.promocion,
-                    combustibles: {
-                        regular: values.combustibles.regular,
-                        premium: values.combustibles.premium,
-                        diesel: values.combustibles.diesel
-                    }
                 };
+
                 response.push(value);
             }
         });
@@ -190,6 +193,7 @@ exports.getgstations = functions.https.onRequest((req, res) => {
 });
 
 // Trigger calcular calificacion a gasolinera (cada que se agrega un comentario)
+
 
 /**
  *  USUARIOS
@@ -228,7 +232,7 @@ exports.getfavoritos = functions.https.onRequest((request, response) => {
                         let values = e.val();
                         let data = {
                             id: e.key,
-                            marca: values.marca,
+                            marca: values.nombre,
                             lat: values.latitud,
                             lng: values.longitud,
                             direccion: values.direccion
@@ -297,7 +301,8 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                 likes: 0,
                 texto: texto,
                 user: uid,
-                frecha: 0 // PONER FECHA
+                gid: gid,
+                fecha: new Date().toLocaleDateString()
             }).then(()=> {
                 mResponse.message = "Comentario enviado";
                 mResponse.response = null;
@@ -305,15 +310,19 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                 return res.send(mResponse);
             });
         } else {
+            let flag = false;
             snapshot.forEach(element => {
                 let values = element.val();
                 console.log(values.user);
                 if (values.user === uid) {
+                    flag = false;
                     return comentarioRef.child(gid).child(element.key).set({
                         calificacion: rank,
                         dislikes: 0,
                         likes: 0,
                         texto: texto,
+                        fecha: new Date().toLocaleDateString(),
+                        gid: gid,
                         user: uid
                     }).then(()=> {
                         mResponse.message = "Comentario actualizado";
@@ -321,38 +330,30 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                         mResponse.status = res.statusCode;
                         return res.send(mResponse);
                     });      
+                } else {
+                    flag = true;
                 }
             });
+            if (flag) {
+                return comentarioRef.child(gid).push({
+                    calificacion: rank,
+                    dislikes: 0,
+                    likes: 0,
+                    texto: texto,
+                    user: uid,
+                    gid: gid,
+                    fecha: new Date().toLocaleDateString()
+                }).then(()=> {
+                    mResponse.message = "Comentario enviado";
+                    mResponse.response = null;
+                    mResponse.status = res.statusCode;
+                    return res.send(mResponse);
+                });
+            }
         }
     });
 });
 // Eliminar comentario (Trigger) cuando los dislikes superan los likes
-
-// Eliminar mi comentario
-exports.delmcomment = functions.https.onRequest((req, res) => {
-    let uid = req.query.uid;
-    let gid = req.query.gid;
-    return comentarioRef.child(gid).once("value", (snapshot) => {
-        if (snapshot.val() !== null) {
-            snapshot.forEach(element => {
-                let value = element.val();
-                if (value.user === uid) {
-                    return element.ref.remove().then(
-                        res.send({
-                            status: 1,
-                            response: "done"
-                        })
-                    );
-                }
-            });
-        } else {
-            mResponse.message = msg_ok;
-            mResponse.response = null;
-            mResponse.status = res.statusCode;
-            return res.send(mResponse);
-        }
-    });
-});
 
 // Dar like/dislike
 exports.likeit = functions.https.onRequest((req, res) => {
@@ -421,7 +422,7 @@ exports.getcomentarios = functions.https.onRequest((req, res) => {
                     uid: values.user,
                     user: val.nombre,
                     fecha: values.fecha
-                };
+                };  
             response.push(data);
             }).then(() => {
                 mResponse.response = response;
@@ -438,14 +439,9 @@ exports.getcomentarios = functions.https.onRequest((req, res) => {
  * SERVICIOS
  */
 
-// Calificar un servicio
-
 // Reportar un servicio (Si existe o no existe)
 
 // Trigger para calcular la calificación del servicio 
 //(cada que se agrega una calificacion se hace promedio)
 
 // Trigger para poner los servicios en "false" cuando se da de alta una gasolinera
-/**
- *  MARCAS
- */
