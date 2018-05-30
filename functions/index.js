@@ -1,4 +1,4 @@
-var functions =  require('firebase-functions');
+var functions = require('firebase-functions');
 var admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);
 
@@ -8,6 +8,13 @@ var db = admin.database();
  *  EXTRAS
  */
 const httpsReq = require('https');
+
+MarcasArray = ["OXXOGAS", "GASORED", "PETRO-7",
+ "HIDROSINA", "ORSAN", "EXXONMOBIL", "REDCO", 
+ "GRUPOECO", "GASMART", "LAGAS", "NEXUM", 
+ "LODEMO", "BP", "RENDICHICAS", "FULLGAS", 
+ "RENDIMAX", "GASMEX", "SHELL", "GASTOP", 
+ "SMARTGAS", "APPRO", "COSTCO", "PEMEX"]
 
 // REFERENCES
 var usersRef = db.ref("/users");
@@ -51,7 +58,6 @@ var msg_tryAgain = "again";
             .child(id)
             .set({  
                 nombre: nombre, // Nombre que viene en PLACES API
-                marca: "¡Reporta el lugar!",
                 direccion: direccion,
                 latitud: lat,
                 longitud: lng,
@@ -59,9 +65,20 @@ var msg_tryAgain = "again";
                 promocion: 0,
                 actualizacion: {
                     fecha: new Date().toLocaleDateString(),
-                    hora: new Date().toLocaleTimeString(),
-                    usuario: uid
+                    usuario: 0
                 }
+            }).then(() => {
+                return combustiblesRef.child(id).set({
+                    regular: 0,
+                    premium: 0,
+                    diesel: 0
+                }).then(() => {
+                    return servicioRef.child(id).set({
+                        wc: 0,
+                        atm: 0,
+                        shop: 0
+                    });
+                }); 
             });
         }
     });
@@ -84,7 +101,6 @@ exports.getgstation = functions.https.onRequest((request, response) => {
                     direccion: values.direccion,
                     latitud: values.latitud,
                     longitud: values.longitud,
-                    marca: values.marca,
                     nombre: values.nombre,
                     promocion: values.promocion
                 }
@@ -114,7 +130,7 @@ function getPlaces(lat, lng, name) {
             data += subr;
         });
         res.on('end', () => {
-            console.log("obteniendo gasolineras");
+            //console.log("obteniendo gasolineras");
             updateGStns(JSON.parse(data));
             });
     }).on("error", (err) => {
@@ -123,7 +139,7 @@ function getPlaces(lat, lng, name) {
     });
 }
 function updateGStns(data) {
-    console.log(data);
+    //console.log(data);
     data.results.forEach(gs => {
         addgstation(gs.place_id, gs.name, gs.vicinity, 
                 gs.geometry.location.lat, gs.geometry.location.lng, '');
@@ -159,10 +175,10 @@ exports.getgstations = functions.https.onRequest((req, res) => {
                     direccion: values.direccion,
                     latitud: values.latitud,
                     longitud: values.longitud,
-                    marca: values.marca,
                     nombre: values.nombre,
-                    promocion: values.promocion
+                    promocion: values.promocion,
                 };
+
                 response.push(value);
             }
         });
@@ -180,6 +196,7 @@ exports.getgstations = functions.https.onRequest((req, res) => {
 });
 
 // Trigger calcular calificacion a gasolinera (cada que se agrega un comentario)
+
 
 /**
  *  USUARIOS
@@ -218,7 +235,7 @@ exports.getfavoritos = functions.https.onRequest((request, response) => {
                         let values = e.val();
                         let data = {
                             id: e.key,
-                            marca: values.marca,
+                            marca: values.nombre,
                             lat: values.latitud,
                             lng: values.longitud,
                             direccion: values.direccion
@@ -255,7 +272,7 @@ exports.setfavorito = functions.https.onRequest((request, response) => {
                     .then(() => {
                         mResponse.response = null;
                         mResponse.status = response.statusCode;
-                        mResponse.message = false;
+                        mResponse.message = "false";
                         return response.send(mResponse);
                     });
             }
@@ -287,7 +304,8 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                 likes: 0,
                 texto: texto,
                 user: uid,
-                fecha: new Date().toLocaleDateString()// PONER FECHA
+                gid: gid,
+                fecha: new Date().toLocaleDateString()
             }).then(()=> {
                 mResponse.message = "Comentario enviado";
                 mResponse.response = null;
@@ -295,17 +313,20 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                 return res.send(mResponse);
             });
         } else {
+            let flag = false;
             snapshot.forEach(element => {
                 let values = element.val();
                 console.log(values.user);
                 if (values.user === uid) {
+                    flag = false;
                     return comentarioRef.child(gid).child(element.key).set({
                         calificacion: rank,
                         dislikes: 0,
                         likes: 0,
                         texto: texto,
-                        user: uid,
-                        fecha: new Date().toLocaleDateString()
+                        fecha: new Date().toLocaleDateString(),
+                        gid: gid,
+                        user: uid
                     }).then(()=> {
                         mResponse.message = "Comentario actualizado";
                         mResponse.response = null;
@@ -313,51 +334,29 @@ exports.addcomment = functions.https.onRequest((req, res) => {
                         return res.send(mResponse);
                     });      
                 } else {
-                    return comentarioRef.child(gid).push({
-                        calificacion: rank,
-                        dislikes: 0,
-                        likes: 0,
-                        texto: texto,
-                        user: uid,
-                        fecha: new Date().toLocaleDateString()
-                    }).then(()=> {
-                        mResponse.message = "Comentario enviado";
-                        mResponse.response = null;
-                        mResponse.status = res.statusCode;
-                        return res.send(mResponse);
-                    });
+                    flag = true;
                 }
             });
+            if (flag) {
+                return comentarioRef.child(gid).push({
+                    calificacion: rank,
+                    dislikes: 0,
+                    likes: 0,
+                    texto: texto,
+                    user: uid,
+                    gid: gid,
+                    fecha: new Date().toLocaleDateString()
+                }).then(()=> {
+                    mResponse.message = "Comentario enviado";
+                    mResponse.response = null;
+                    mResponse.status = res.statusCode;
+                    return res.send(mResponse);
+                });
+            }
         }
     });
 });
 // Eliminar comentario (Trigger) cuando los dislikes superan los likes
-
-// Eliminar mi comentario
-exports.delmcomment = functions.https.onRequest((req, res) => {
-    let uid = req.query.uid;
-    let gid = req.query.gid;
-    return comentarioRef.child(gid).once("value", (snapshot) => {
-        if (snapshot.val() !== null) {
-            snapshot.forEach(element => {
-                let value = element.val();
-                if (value.user === uid) {
-                    return element.ref.remove().then(
-                        res.send({
-                            status: 1,
-                            response: "done"
-                        })
-                    );
-                }
-            });
-        } else {
-            mResponse.message = msg_ok;
-            mResponse.response = null;
-            mResponse.status = res.statusCode;
-            return res.send(mResponse);
-        }
-    });
-});
 
 // Dar like/dislike
 exports.likeit = functions.https.onRequest((req, res) => {
@@ -426,7 +425,7 @@ exports.getcomentarios = functions.https.onRequest((req, res) => {
                     uid: values.user,
                     user: val.nombre,
                     fecha: values.fecha
-                };
+                };  
             response.push(data);
             }).then(() => {
                 mResponse.response = response;
@@ -443,21 +442,9 @@ exports.getcomentarios = functions.https.onRequest((req, res) => {
  * SERVICIOS
  */
 
-// Calificar un servicio
-
 // Reportar un servicio (Si existe o no existe)
 
 // Trigger para calcular la calificación del servicio 
 //(cada que se agrega una calificacion se hace promedio)
 
-// Trigger para poner los servicios en false cuando se da de alta una gasolinera
-
-
-
-/**
- *  COMBUSTIBLES
- */
-
-/**
- *  MARCAS
- */
+// Trigger para poner los servicios en "false" cuando se da de alta una gasolinera
