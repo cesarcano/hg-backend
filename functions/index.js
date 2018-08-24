@@ -14,7 +14,7 @@ var usersRef = db.ref("/users");
 var gstationsRef = db.ref("/gasolineras");
 var combustiblesRef = db.ref("/combustibles");
 var comentarioRef = db.ref("/comentarios");
-var likesref = db.ref("/reacciones");
+var serviciosRef = db.ref("/servicios");
 
 /**
  *  AUTH
@@ -104,6 +104,22 @@ function sortGas(snapshotJSON, creGas) {
         
     });
 }
+
+function setServicioDefault(snapGas) {
+    //serviciosRef.remove();
+    snapGas.forEach(station => {
+        serviciosRef.child(station.key).once("value", (snapshot) => {
+            if (snapshot.val() === null) {
+                serviciosRef.child(station.key).set({
+                        atm : "false",
+                        shop : "false",
+                        wc : "false"
+                    });
+            }
+        });
+           
+    });
+}
 */
 
 exports.getstations =  functions.https.onRequest((request, response) => {
@@ -122,6 +138,7 @@ exports.getstations =  functions.https.onRequest((request, response) => {
     var snapCombs = '';
     return gstationsRef.once("value", (snapshot) => {
         snapGas = snapshot;
+        //setServicioDefault(snapGas);
     }).then(() => {
         return combustiblesRef.once("value", (snap) => {
             snapCombs = snap;
@@ -132,14 +149,15 @@ exports.getstations =  functions.https.onRequest((request, response) => {
                     gasArray = getGasOnMap(lat, lng, distance, marcas, combustibles, snapCombs, snapGas);
                     break;
                 case "1": //Ordenados por precio
-                    
+                    gasArray = getGasByPrecio(lat, lng, distance, marcas, combustibles, snapCombs, snapGas, combustibles[0]);
                     break;
                 case "2": // Ordenados por calificacion
-                    gasArray = getGasByCalif(lat, lng, distance, marcas, combustibles, snapCombs, snapGas);
-                    break;
+                    return comentarioRef.once("value", (comments) => {
+                        gasArray = getGasByCalif(lat, lng, distance, marcas, combustibles, snapCombs, snapGas, comments);
+                    }).then(() => {
+                        return response.send(gasArray);
+                    });
                 case "3": // Ordenados por distancia
-                    break;
-                default:
                     break;
             }
             return response.send(gasArray);
@@ -152,56 +170,103 @@ function getGasOnMap(lat, lng, distance, marcas_array, combustibles_array, snapC
     var array_gasolineras = [];
         snapGas.forEach(gasolinera => {
             let g = gasolinera.toJSON();
-            if (estaCerca(g.lat, g.lng, lat, lng, distance)) {
-                if (esDeLaMarca(g.marca, marcas_array)) {
-                    if (tieneCombustibles(gasolinera.key, combustibles_array, snapCombs)) {
-                        array_gasolineras.push(gasolinera.toJSON());
-                        console.log(gasolinera.key);
-                        
-                    }
+            if (estaCerca(g.lat, g.lng, lat, lng, distance) && esDeLaMarca(g.marca, marcas_array)
+            && tieneCombustibles(gasolinera.key, combustibles_array, snapCombs)) {
+                let gasResponse = {
+                    id: gasolinera.key,
+                    calificacion: g.calificacion,
+                    direccion: g.direccion,
+                    lat: g.lat,
+                    lng: g.lng,
+                    marca: g.marca,
                 }
+                snapCombs.forEach(c => {
+                    if (c.key === gasolinera.key) {
+                        let gsC = c.toJSON();
+                        delete gsC.cre_id;
+                        gasResponse.combustibles = gsC;
+                    }
+                });
+                array_gasolineras.push(gasResponse);
             }
         });        
     return array_gasolineras;
 }
 
-function getGasByCalif(lat, lng, distance, marcas_array, combustibles_array, snapCombs, snapGas) {
+function getGasByCalif(lat, lng, distance, marcas_array, combustibles_array, snapCombs, snapGas, comments) {
     var array_gasolineras = [];
         snapGas.forEach(gasolinera => {
             let g = gasolinera.toJSON();
-            if (estaCerca(g.lat, g.lng, lat, lng, distance)) {
-                if (esDeLaMarca(g.marca, marcas_array)) {
-                    if (tieneCombustibles(gasolinera.key, combustibles_array, snapCombs)) {
-                        array_gasolineras.push(gasolinera.toJSON());
+            if (estaCerca(g.lat, g.lng, lat, lng, distance) && esDeLaMarca(g.marca, marcas_array)
+                && tieneCombustibles(gasolinera.key, combustibles_array, snapCombs)) {
+                    let calificacion = 0;
+                    let i = 0;
+                    let gasResponse = {
+                        id: gasolinera.key,
+                        direccion: g.direccion,
+                        lat: g.lat,
+                        lng: g.lng,
+                        marca: g.marca,
                     }
-                }
+                    comments.forEach(c => {
+                        if (c.val() !== null) {
+                            if (gasolinera.key === c.key) {
+                                c.forEach(cmt => {
+                                    let v = cmt.val();
+                                        i++;
+                                    calificacion += parseFloat(v.calificacion);
+                                });
+                            }
+                        }
+                    });
+                    calificacion = calificacion > 0 ? parseFloat(calificacion / i) : calificacion;
+                    gasResponse.calificacion =  calificacion > 0 ? parseFloat(calificacion.toFixed(1)): calificacion;
+                    snapCombs.forEach(c => {
+                        if (c.key === gasolinera.key) {
+                            let gsC = c.toJSON();
+                            delete gsC.cre_id;
+                            gasResponse.combustibles = gsC;
+                        }
+                    });
+                    array_gasolineras.push(gasResponse);
             }
         });        
         array_gasolineras.sort((a, b) => parseFloat(a.calificacion) - parseFloat(b.calificacion));
     return array_gasolineras;
 }
 
-function getGasByDistance() {
-    
-}
-
-function getGasByPrice(lat, lng, distance, marcas_array, combustibles_array, snapCombs, snapGas) {
+function getGasByPrecio(lat, lng, distance, marcas_array, combustibles_array, snapCombs, snapGas, combId) {
     var array_gasolineras = [];
         snapGas.forEach(gasolinera => {
             let g = gasolinera.toJSON();
-            if (estaCerca(g.lat, g.lng, lat, lng, distance)) {
-                if (esDeLaMarca(g.marca, marcas_array)) {
-                    if (tieneCombustibles(gasolinera.key, combustibles_array, snapCombs)) {
-                        array_gasolineras.push(gasolinera.toJSON());
+            if (estaCerca(g.lat, g.lng, lat, lng, distance) && esDeLaMarca(g.marca, marcas_array)
+                && tieneCombustibles(gasolinera.key, combustibles_array, snapCombs)) {
+                    let gasResponse = {
+                        id: gasolinera.key,
+                        calificacion: g.calificacion,
+                        direccion: g.direccion,
+                        lat: g.lat,
+                        lng: g.lng,
+                        marca: g.marca,
                     }
-                }
+                    snapCombs.forEach(c => {
+                        if (c.key === gasolinera.key) {
+                            let gsC = c.toJSON();
+                            delete gsC.cre_id;
+                            gasResponse.combustibles = gsC;
+                        }
+                    });
+                    
+                    array_gasolineras.push(gasResponse);
             }
-        });        
+        });       
+        array_gasolineras.sort((a, b) => parseFloat(a.combustibles[combId]) - parseFloat(b.combustibles[combId]));
     return array_gasolineras;
 }
 
-
-
+function getGasByDistance() {
+    
+}
 // Evalua si la gasolinera tiene los combustibles
 function tieneCombustibles(gID, combustibles_array, snapCombs) {
     let flag = 0;
@@ -251,4 +316,19 @@ function estaCerca(gLat, gLng, lat, lng, distance) {
         return true;
     } 
     return false;
+}
+
+function calcularCalificacion(gId) {
+    let i = 0;
+    let calificacion = 0;
+    return combustiblesRef.child(gId).once("value", (snapshot) => {
+            let comentario = snapshot.val();
+            if (snapshot.val() === null) {
+                calificacion = 0;
+            }
+            i++;
+            calificacion += parseFloat(comentario.calificacion);
+    }).then(() => {
+        return calificacion/i;
+    });
 }
