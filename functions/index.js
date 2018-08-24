@@ -158,40 +158,14 @@ exports.getstations =  functions.https.onRequest((request, response) => {
                         return response.send(gasArray);
                     });
                 case "3": // Ordenados por distancia
-                    break;
+                gasArray = getGasOnMap(lat, lng, distance, marcas, combustibles, snapCombs, snapGas);
+                break;
             }
             return response.send(gasArray);
         });
     });
 
 });
-
-function getGasOnMap(lat, lng, distance, marcas_array, combustibles_array, snapCombs, snapGas) {
-    var array_gasolineras = [];
-        snapGas.forEach(gasolinera => {
-            let g = gasolinera.toJSON();
-            if (estaCerca(g.lat, g.lng, lat, lng, distance) && esDeLaMarca(g.marca, marcas_array)
-            && tieneCombustibles(gasolinera.key, combustibles_array, snapCombs)) {
-                let gasResponse = {
-                    id: gasolinera.key,
-                    calificacion: g.calificacion,
-                    direccion: g.direccion,
-                    lat: g.lat,
-                    lng: g.lng,
-                    marca: g.marca,
-                }
-                snapCombs.forEach(c => {
-                    if (c.key === gasolinera.key) {
-                        let gsC = c.toJSON();
-                        delete gsC.cre_id;
-                        gasResponse.combustibles = gsC;
-                    }
-                });
-                array_gasolineras.push(gasResponse);
-            }
-        });        
-    return array_gasolineras;
-}
 
 function getGasByCalif(lat, lng, distance, marcas_array, combustibles_array, snapCombs, snapGas, comments) {
     var array_gasolineras = [];
@@ -207,6 +181,7 @@ function getGasByCalif(lat, lng, distance, marcas_array, combustibles_array, sna
                         lat: g.lat,
                         lng: g.lng,
                         marca: g.marca,
+                        distancia: calcularDistancia(lat, lng, g.lat, g.lng)
                     }
                     comments.forEach(c => {
                         if (c.val() !== null) {
@@ -248,6 +223,7 @@ function getGasByPrecio(lat, lng, distance, marcas_array, combustibles_array, sn
                         lat: g.lat,
                         lng: g.lng,
                         marca: g.marca,
+                        distancia: calcularDistancia(lat, lng, g.lat, g.lng)
                     }
                     snapCombs.forEach(c => {
                         if (c.key === gasolinera.key) {
@@ -264,8 +240,34 @@ function getGasByPrecio(lat, lng, distance, marcas_array, combustibles_array, sn
     return array_gasolineras;
 }
 
-function getGasByDistance() {
-    
+function getGasOnMap(lat, lng, distance, marcas_array, combustibles_array, snapCombs, snapGas) {
+    var array_gasolineras = [];
+        snapGas.forEach(gasolinera => {
+            let g = gasolinera.toJSON();
+            if (estaCerca(g.lat, g.lng, lat, lng, distance) && esDeLaMarca(g.marca, marcas_array)
+            && tieneCombustibles(gasolinera.key, combustibles_array, snapCombs)) {
+                let gasResponse = {
+                    id: gasolinera.key,
+                    calificacion: g.calificacion,
+                    direccion: g.direccion,
+                    lat: g.lat,
+                    lng: g.lng,
+                    marca: g.marca,
+                    distancia: calcularDistancia(lat, lng, g.lat, g.lng)
+                }
+                snapCombs.forEach(c => {
+                    if (c.key === gasolinera.key) {
+                        let gsC = c.toJSON();
+                        delete gsC.cre_id;
+                        gasResponse.combustibles = gsC;
+                    }
+                });
+                array_gasolineras.push(gasResponse);
+            }
+        });        
+
+        array_gasolineras.sort((a, b) => parseFloat(a.distancia) - parseFloat(b.distancia));
+    return array_gasolineras;
 }
 // Evalua si la gasolinera tiene los combustibles
 function tieneCombustibles(gID, combustibles_array, snapCombs) {
@@ -318,17 +320,20 @@ function estaCerca(gLat, gLng, lat, lng, distance) {
     return false;
 }
 
-function calcularCalificacion(gId) {
-    let i = 0;
-    let calificacion = 0;
-    return combustiblesRef.child(gId).once("value", (snapshot) => {
-            let comentario = snapshot.val();
-            if (snapshot.val() === null) {
-                calificacion = 0;
-            }
-            i++;
-            calificacion += parseFloat(comentario.calificacion);
-    }).then(() => {
-        return calificacion/i;
-    });
+function calcularDistancia(lat1,lon1,lat2,lon2) {
+    rad = function(x) {return x*Math.PI/180;}
+    var R = 6378137; //Radio de la tierra en metros
+    var dLat = rad( lat2 - lat1 );
+    var dLong = rad( lon2 - lon1 );
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLong/2) * Math.sin(dLong/2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    var d = R * c;
+    /*
+    if (d >= 1000) {
+        d = parseFloat(d / 1000);
+        d = d.toFixed(1);
+    } else {
+        d = parseInt(d);
+    }*/
+    return parseInt(d); 
 }
