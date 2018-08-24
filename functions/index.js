@@ -266,7 +266,7 @@ function getGasOnMap(lat, lng, distance, marcas_array, combustibles_array, snapC
             }
         });        
 
-        array_gasolineras.sort((a, b) => parseFloat(a.distancia) - parseFloat(b.distancia));
+    array_gasolineras.sort((a, b) => parseFloat(a.distancia) - parseFloat(b.distancia));
     return array_gasolineras;
 }
 // Evalua si la gasolinera tiene los combustibles
@@ -306,15 +306,9 @@ function esDeLaMarca(gMarca, marcas_array) {
 
 // Evalúa si la gasolinera está en el área
 function estaCerca(gLat, gLng, lat, lng, distance) {  
-    let lat_inf = lat - 0.05;
-    let lng_inf = lng - 0.05;
-    let lat_sup = parseFloat(lat) + parseFloat(0.05);
-    let lng_sup = parseFloat(lng) + parseFloat(0.05);
+    let distancia = calcularDistancia(lat, lng, gLat, gLng);
 
-    let isLat = ( gLat < lat_sup && gLat > lat_inf);
-    let isLng = ( gLng < lng_sup && gLng > lng_inf);
-
-    if (isLat && isLng) {
+    if (distancia <= distance) {
         return true;
     } 
     return false;
@@ -328,12 +322,6 @@ function calcularDistancia(lat1,lon1,lat2,lon2) {
     var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLong/2) * Math.sin(dLong/2);
     var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     var d = R * c;
-    /*
-    if (d >= 1000) {
-        d = parseFloat(d / 1000);
-        d = d.toFixed(1);
-    } else {
-        d = parseInt(d);
-    }*/
+    
     return parseInt(d); 
 }
