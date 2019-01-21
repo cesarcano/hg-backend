@@ -112,7 +112,6 @@ exports.getstations = functions.https.onRequest((request, response) => {
         }).then(() => {
             switch (filtro) {
             case "0":  // Filtro en mapa -> Distancia
-                //respuesta = ordenarFiltroDistancia(respuesta);
                 respuesta.sort((a, b) => parseFloat(a.distancia) - parseFloat(b.distancia));
                 break;
             case "1": // Filtro por precio
