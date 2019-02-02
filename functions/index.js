@@ -8,6 +8,8 @@ const gasolinerasNodo = dba.ref("/gasolineras");
 const coordenadasNodo = dba.ref("/coordenadas");
 const combustiblesNodo = dba.ref("/combustibles");
 const comentariosNodo = dba.ref("/comentarios");
+const preferenciasNodo = dba.ref("/preferencias");
+const usersNodo = dba.ref("/users");
 
 exports.getstations = functions.https.onRequest((request, response) => {
     if(request.method !== "POST"){
@@ -21,7 +23,8 @@ exports.getstations = functions.https.onRequest((request, response) => {
     const filtro = request.body.filtro;
     const combustibles = request.body.combustibles;
     const dpi = request.body.dpi;
-
+    const uId = typeof request.body.uId !== "undefined"? request.body.uId : null;
+    
     let mlat = Math.trunc(lat) - 1;
     let mlng = Math.trunc(lng) - 1;
     let combId = combustibles[0];
@@ -29,57 +32,57 @@ exports.getstations = functions.https.onRequest((request, response) => {
     let respuesta = [];
     return coordenadasNodo.child(mlat).child(mlng).once("value", (snapshot) => {
         if(snapshot.val() !== null) {
-        snapshot.forEach(snap => {
-            let isMarca = esDeLaMarca(snap.key, marcas);
-            if (isMarca) {
-            snap.forEach(s => {
-                let g = s.val();
-                let tieneDistancia = estaCerca(g.lat, g.lng, lat, lng, distance);
-                let hasCombustibles = tieneCombustibles(combustibles, g.combustibles);
-                if (tieneDistancia && hasCombustibles) {
-                let gasResponse = {
-                    id: s.key,
-                    calificacion: Math.round(g.calificacion),
-                    direccion: g.direccion,
-                    lat: g.lat,
-                    lng: g.lng,
-                    url:"https://firebasestorage.googleapis.com/v0/b/hellogas-3db04.appspot.com/o/marcadores%2F" + getIconUrl(g.marca, dpi) + "?alt=media",
-                    marca: g.marca,
-                    distancia: calcularDistancia(lat, lng, g.lat, g.lng),
-                    combustibles: g.combustibles
-                };   
-                respuesta.push(gasResponse);
+            snapshot.forEach(snap => {
+                let isMarca = esDeLaMarca(snap.key, marcas);
+                if (isMarca) {
+                    snap.forEach(s => {
+                        let g = s.val();
+                        let tieneDistancia = estaCerca(g.lat, g.lng, lat, lng, distance);
+                        let hasCombustibles = tieneCombustibles(combustibles, g.combustibles);
+                        if (tieneDistancia && hasCombustibles) {
+                        let gasResponse = {
+                            id: s.key,
+                            calificacion: Math.round(g.calificacion),
+                            direccion: g.direccion,
+                            lat: g.lat,
+                            lng: g.lng,
+                            url:"https://firebasestorage.googleapis.com/v0/b/hellogas-3db04.appspot.com/o/marcadores%2F" + getIconUrl(g.marca, dpi) + "?alt=media",
+                            marca: g.marca,
+                            distancia: calcularDistancia(lat, lng, g.lat, g.lng),
+                            combustibles: g.combustibles
+                        };   
+                        respuesta.push(gasResponse);
+                        }
+                    });
                 }
             });
-            }
-        });
         }
     }).then(() => {
         return coordenadasNodo.child(mlat+1).child(mlng+1).once("value", (snapshot) => {
         if(snapshot.val() !== null) {
             snapshot.forEach(snap => {
-            let isMarca = esDeLaMarca(snap.key, marcas);
-            if (isMarca) {
-                snap.forEach(s => {
-                let g = s.val();
-                let tieneDistancia = estaCerca(g.lat, g.lng, lat, lng, distance);
-                let hasCombustibles = tieneCombustibles(combustibles, g.combustibles);
-                if (tieneDistancia && hasCombustibles) {
-                    let gasResponse = {
-                    id: s.key,
-                    calificacion: Math.round(g.calificacion),
-                    direccion: g.direccion,
-                    lat: g.lat,
-                    lng: g.lng,
-                    url:"https://firebasestorage.googleapis.com/v0/b/hellogas-3db04.appspot.com/o/marcadores%2F" + getIconUrl(g.marca, dpi) + "?alt=media",
-                    marca: g.marca,
-                    distancia: calcularDistancia(lat, lng, g.lat, g.lng),
-                    combustibles: g.combustibles
-                    };   
-                    respuesta.push(gasResponse);
+                let isMarca = esDeLaMarca(snap.key, marcas);
+                if (isMarca) {
+                    snap.forEach(s => {
+                        let g = s.val();
+                        let tieneDistancia = estaCerca(g.lat, g.lng, lat, lng, distance);
+                        let hasCombustibles = tieneCombustibles(combustibles, g.combustibles);
+                            if (tieneDistancia && hasCombustibles) {
+                                let gasResponse = {
+                                id: s.key,
+                                calificacion: Math.round(g.calificacion),
+                                direccion: g.direccion,
+                                lat: g.lat,
+                                lng: g.lng,
+                                url:"https://firebasestorage.googleapis.com/v0/b/hellogas-3db04.appspot.com/o/marcadores%2F" + getIconUrl(g.marca, dpi) + "?alt=media",
+                                marca: g.marca,
+                                distancia: calcularDistancia(lat, lng, g.lat, g.lng),
+                                combustibles: g.combustibles
+                                };   
+                                respuesta.push(gasResponse);
+                            }
+                    });
                 }
-                });
-            }
             });
         }
         }).then(() => {
@@ -87,29 +90,33 @@ exports.getstations = functions.https.onRequest((request, response) => {
             if(snapshot.val() !== null) {
             snapshot.forEach(snap => {
                 let isMarca = esDeLaMarca(snap.key, marcas);
-                if (isMarca) {
-                snap.forEach(s => {
-                    let g = s.val();
-                    let tieneDistancia = estaCerca(g.lat, g.lng, lat, lng, distance);
-                    let hasCombustibles = tieneCombustibles(combustibles, g.combustibles);
-                    if (tieneDistancia && hasCombustibles) {
-                    let gasResponse = {
-                        id: s.key,
-                        calificacion: Math.round(g.calificacion),
-                        direccion: g.direccion,
-                        lat: g.lat,
-                        lng: g.lng,
-                        url:"https://firebasestorage.googleapis.com/v0/b/hellogas-3db04.appspot.com/o/marcadores%2F" + getIconUrl(g.marca, dpi) + "?alt=media",
-                        marca: g.marca,
-                        distancia: calcularDistancia(lat, lng, g.lat, g.lng),
-                        combustibles: g.combustibles
-                    };   ta.push(gasResponse);
+                    if (isMarca) {
+                        snap.forEach(s => {
+                            let g = s.val();
+                            let tieneDistancia = estaCerca(g.lat, g.lng, lat, lng, distance);
+                            let hasCombustibles = tieneCombustibles(combustibles, g.combustibles);
+                            if (tieneDistancia && hasCombustibles) {
+                                let gasResponse = {
+                                    id: s.key,
+                                    calificacion: Math.round(g.calificacion),
+                                    direccion: g.direccion,
+                                    lat: g.lat,
+                                    lng: g.lng,
+                                    url:"https://firebasestorage.googleapis.com/v0/b/hellogas-3db04.appspot.com/o/marcadores%2F" + getIconUrl(g.marca, dpi) + "?alt=media",
+                                    marca: g.marca,
+                                    distancia: calcularDistancia(lat, lng, g.lat, g.lng),
+                                    combustibles: g.combustibles
+                                };   
+                                respuesta.push(gasResponse);
+                            }
+                        });
                     }
-                });
-                }
             });
             }
         }).then(() => {
+            if ( uId !== "" && uId !== null) {
+                guardarPreferencias(uId, distance, combustibles, marcas);
+            }
             switch (filtro) {
             case "0":  // Filtro en mapa -> Distancia
                 respuesta.sort((a, b) => parseFloat(a.distancia) - parseFloat(b.distancia));
@@ -226,3 +233,33 @@ exports.nuevoComentario = functions.database.ref('/comentarios/{gasId}/{pushId}'
       });
     });
   });
+
+function guardarPreferencias(uId, distance, combustibles, marcas) {
+    return usersNodo.child(uId).once("value", (snapshot) => {
+      if (snapshot.val() !== null) {
+        return preferenciasNodo.child(uId).set({
+            distancia: distance,
+            combustibles: combustiblesPref(combustibles),
+            marcas: marcasPref(marcas)
+        });
+      }
+    });
+}
+
+function combustiblesPref(combustibles) {
+    let nodoCombustible  = new Object();
+    for (let i = 0; i < combustibles.length; i++) {
+        let combustible = combustibles[i] === "all"? "todos": combustibles[i];
+        nodoCombustible[i]  = combustible;
+    }
+    return nodoCombustible;
+}
+
+function marcasPref(marcas) {
+    let nodoMarcas = new Object();
+    for (let i = 0; i < marcas.length; i++) {
+        let marca = marcas[i] === "all"? "todas": marcas[i];
+        nodoMarcas[i]  = marca;
+    }
+    return nodoMarcas;
+}
