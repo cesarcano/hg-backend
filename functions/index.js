@@ -10,10 +10,85 @@ const httpsReq = require('http');
 
 const gasolinerasNodo = dba.ref("/gasolineras");
 const coordenadasNodo = dba.ref("/coordenadas");
-//const combustiblesNodo = dba.ref("/combustibles");
 const comentariosNodo = dba.ref("/comentarios");
 const preferenciasNodo = dba.ref("/preferencias");
+const serviciosNodo = dba.ref("/servicios");
 const usersNodo = dba.ref("/users");
+
+exports.getGasDetalle = functions.https.onRequest((request, response) => {
+    if(request.method !== "POST"){
+        response.send(405, 'HTTP Method ' + request.method +' not allowed');
+    }
+    const gasId = request.body.gasId;
+    let body = new Object();
+    return gasolinerasNodo.child(gasId).once("value", (snapshot) => {
+        let shot = snapshot.val();
+        body["id"] = gasId;
+        body["direccion"] = shot.direccion;
+        body["combustibles"] = shot.combustibles;
+        body["marca"] = shot.marca;
+        body["lat"] = shot.lat;
+        body["lng"] = shot.lng;
+    }).then(() => {
+        //comentarios & calificacion
+        return comentariosNodo.child(gasId).once("value", (snap) => {
+            if (snap.val() !== null) {
+                let promedio = 0;
+                let i = 0;
+                snap.forEach(element => {
+                    i++;
+                    let e = element.val()
+                    promedio += e.calificacion; 
+                });
+                body["comentarios"] = snap.val();
+               
+                body["calificacion"] = Math.round(promedio / i);
+            } else {    
+                body["comentarios"] = "null";
+                body["calificacion"] = 0;
+            }
+        }).then(()=> {
+            return serviciosNodo.child(gasId).once("value", (s) => {
+                if (s.val() !== null) {
+                    let servicios = [];
+                    s.forEach(element => {
+                        servicios.push(element.key);
+                    });
+                    body["servicios"] = servicios;
+                } else {
+                    body["servicios"] = "null";
+                }
+            }).then(() => {
+                return response.send(body);
+            });
+        });
+    });
+});
+
+exports.getGasCalificacion = functions.https.onRequest((request, response) => {
+    if(request.method !== "POST"){
+        response.send(405, 'HTTP Method ' + request.method +' not allowed');
+    }
+    const gasId = request.body.gasId;
+    let body = new Object();
+    return comentariosNodo.child(gasId).once("value", (snap) => {
+        if (snap.val() !== null) {
+            let promedio = 0;
+            let i = 0;
+            snap.forEach(element => {
+                i++;
+                let e = element.val()
+                promedio += e.calificacion;
+            });
+            body["calificacion"] = Math.round(promedio / i);
+        } else {    
+            body["calificacion"] = 0;
+        }
+    }).then(()=> {
+        body["id"] = gasId;
+        return response.send(body);
+    });
+});
 
 exports.getstations = functions.https.onRequest((request, response) => {
     if(request.method !== "POST"){
@@ -120,7 +195,7 @@ exports.getstations = functions.https.onRequest((request, response) => {
                 respuesta.sort((a, b) => parseFloat(a.distancia) - parseFloat(b.distancia));
                 break;
             case "1": // Filtro por precio
-                respuesta.sort((a, b) => parseFloat(a.combustibles[combId]) - parseFloat(b.combustibles[combId]));
+                respuesta.sort((a, b) => parseFloat(a.combustibles[combId].precio - parseFloat(b.combustibles[combId].precio)));
                 break;
             case "2": // Filtro por calificación
                 respuesta.sort((a, b) => parseFloat(a.calificacion) - parseFloat(b.calificacion));
@@ -334,8 +409,6 @@ exports.updatestations = functions.https.onRequest((req, response) => {
             data += subr;
         });
         res.on('end', () => {
-            console.log("obteniendo gasolineras");
-            console.log("Leyendo...");
             setGasInf(JSON.parse(data))
         });
     }).on("error", (err) => {
@@ -356,7 +429,7 @@ function setGasolineraCompleta(item) {
         let cre_id = item.Numero.replace(/\//g, "-");
         let nCombustible = item.SubProducto;
         nCombustible = nCombustible.toLowerCase();
-        //if(gasolinerasNodo.child(cre_id).ref === null) {
+        if(gasolinerasNodo.child(cre_id).ref === null) {
             let gasolinera = new Object();
             gasolinera["actualizacion"] = Date.now();
             gasolinera["cre_id"] = cre_id;
@@ -367,7 +440,7 @@ function setGasolineraCompleta(item) {
             gasolinera["calificacion"] = 0;
             gasolinera["marca"] = "PEMEX";
             gasolinerasNodo.child(cre_id).update(gasolinera);
-        //}
+        }
 
         // Info combustible
         if (nCombustible.includes("regular")) {
@@ -479,4 +552,5 @@ exports.setMarcas = functions.https.onRequest((request, response) => {
         });
 
     });
+    return response.send("Marcas actualizadas");
 });
